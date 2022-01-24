@@ -10,7 +10,7 @@ __all__ = ['densenet']
 """
 densenet with basic block.
 """
-growR = 4
+growR = 12
 
 
 class BasicBlock(nn.Module):
