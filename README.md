@@ -1,7 +1,7 @@
 # ZeroBN
 
 This repository contains a pytorch implementation for the latency-critical
-neural network adjustment method.
+neural network optimization method.
 ![avatar](fig/framework.png)
 
 # Dependencies
