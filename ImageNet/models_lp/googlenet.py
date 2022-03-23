@@ -9,10 +9,9 @@ from torch import Tensor
 
 __all__ = ['googlenetlp']
 
-model_urls = {
-    # GoogLeNet ported from TensorFlow
-    'googlenet': 'https://download.pytorch.org/models/googlenet-1378be20.pth',
-}
+'''
+The existence of branch architecture does not require preprocessing for layer pruning.
+'''
 
 GoogLeNetOutputs = namedtuple('GoogLeNetOutputs', ['logits', 'aux_logits2', 'aux_logits1'])
 GoogLeNetOutputs.__annotations__ = {'logits': Tensor, 'aux_logits2': Optional[Tensor],

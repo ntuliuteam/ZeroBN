@@ -63,7 +63,7 @@ in the training process.
 
 # Tensorflow Support
 As Tensorflow is widely used in edge GPU, we also support covert our
-model from PyTorch into Tensorflow frozen *.pb* file.
+model from PyTorch into Tensorflow frozen *.pb* file and remove all zeroized weights.
 
 ```shell
 cd Torch2pb
