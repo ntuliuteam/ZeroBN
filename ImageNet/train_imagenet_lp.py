@@ -4,6 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 
 import argparse
+import copy
 import os
 import random
 import shutil
@@ -22,13 +23,14 @@ import torch.utils.data.distributed
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 # import torchvision.models as models
-import models
+import models_lp as models
+from models_lp.vgg import vgg_block
+import numpy as np
 
-# import numpy as np
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
                      and callable(models.__dict__[name]))
-
+print(model_names)
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('data', metavar='DIR',
                     help='path to dataset')
@@ -96,44 +98,66 @@ parser.add_argument('--autostart_zerobn', '-auto', dest='auto', action='store_tr
 
 best_acc1 = 0
 
-skip_list = [4, 5, 8, 11, 14, 15, 18, 21, 24, 27, 28, 31, 34, 37, 40, 43, 46, 47, 50, 53]  # = id + 1
-
 
 def zeroBN(model, args):
     total = 0
-    count = 0
     for m in model.modules():
-        if isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.SyncBatchNorm):
-            count = count + 1
-            if count not in skip_list:
-                total += m.weight.data.shape[0]
-    count = 0
+        if isinstance(m, nn.BatchNorm2d):
+            total += m.weight.data.shape[0]
+
+    # print("zerobn total channel", total)
     bn = torch.zeros(total)
     index = 0
     for m in model.modules():
-        if isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.SyncBatchNorm):
-            count = count + 1
-            if count not in skip_list:
-                size = m.weight.data.shape[0]
-                bn[index:(index + size)] = m.weight.data.abs().clone()
-                index += size
-    count = 0
+        if isinstance(m, nn.BatchNorm2d):
+            size = m.weight.data.shape[0]
+            bn[index:(index + size)] = m.weight.data.abs().clone()
+            index += size
 
     y, i = torch.sort(bn)
     thre_index = int(total * args.prune_ratio)
     thre = y[thre_index]
 
-    for m in model.modules():
-        if isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.SyncBatchNorm):
-            # tmp = m.weight.data.abs()
-            count = count + 1
-            if count not in skip_list:
+    if 'vgg' in args.arch:
+        for m in model.modules():
+            if isinstance(m, vgg_block):
+                for m2 in m.modules():
+                    if isinstance(m2, nn.BatchNorm2d):
+
+                        k = m2.weight.data.abs() - thre
+                        k = k + k.abs()
+                        k = k.sign()
+                        m2.weight.data = m2.weight.data * k
+                        m2.bias.data = m2.bias.data * k
+                        nonzero = torch.nonzero(k).size()[0]
+                        all = k.size()[0]
+
+                        if 1.0 * nonzero / all < 0.3:
+                            m.shortcut.data[1] = m.shortcut.data[0].abs().sign()
+                            # m.shortcut.data[0] = m.shortcut.data[0]*0
+                            m2.weight.data = m2.weight.data * 0
+                            m2.bias.data = m2.bias.data * 0
+
+                        else:
+                            m.shortcut.data[1] = m.shortcut.data[1] * 0
+
+                        break
+    else:
+        for m in model.modules():
+
+            if isinstance(m, nn.BatchNorm2d):
+
                 k = m.weight.data.abs() - thre
                 k = k + k.abs()
                 k = k.sign()
                 m.weight.data = m.weight.data * k
                 m.bias.data = m.bias.data * k
-    count = 0
+                nonzero = torch.nonzero(k).size()[0]
+                all = k.size()[0]
+
+                if 1.0 * nonzero / all < 0.10:
+                    m.weight.data = m.weight.data * 0
+                    m.bias.data = m.bias.data * 0
 
 
 def main(times):
@@ -141,18 +165,14 @@ def main(times):
 
     args.save = os.path.join(args.save, str(times))
 
-    assert 'resnet50_new' in args.arch
-
     args.mode = args.interval + 1
 
     if args.auto:
         print('auto start zerbn')
-        args.zerobn = int(args.prune_ratio * (-args.epochs/3) + args.epochs*2/3)
-        args.zerobn = (args.zerobn//10)*10
+        args.zerobn = int(args.prune_ratio * (-args.epochs / 3) + args.epochs * 2 / 3)
+        args.zerobn = (args.zerobn // 10) * 10
 
         args.auto = False
-
-    print(args.zerobn)
 
     if not os.path.exists(args.save):
         os.makedirs(args.save)
@@ -211,7 +231,7 @@ def main_worker(gpu, ngpus_per_node, args):
         print("=> using pre-trained model '{}'".format(args.arch))
         model = models.__dict__[args.arch](pretrained=True)
     else:
-        print("=> creating model '{}'".format(args.arch))
+        # print("=> creating model '{}'".format(args.arch))
         model = models.__dict__[args.arch]()
 
     if not torch.cuda.is_available():
@@ -243,14 +263,14 @@ def main_worker(gpu, ngpus_per_node, args):
         model = model.cuda(args.gpu)
     else:
         # DataParallel will divide and allocate batch_size to all available GPUs
-        if args.arch.startswith('alexnet') or args.arch.startswith('vgg'):
-            model.features = torch.nn.DataParallel(model.features)
-            model.cuda()
-
-        else:
-            model = torch.nn.DataParallel(model).cuda()
+        # if args.arch.startswith('alexnet') or args.arch.startswith('vgg'):
+        #     model.features = torch.nn.DataParallel(model.features)
+        #     model.cuda()
+        # else:
+        model = torch.nn.DataParallel(model).cuda()
 
     # define loss function (criterion) and optimizer
+
     criterion = nn.CrossEntropyLoss().cuda(args.gpu)
 
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
@@ -262,11 +282,13 @@ def main_worker(gpu, ngpus_per_node, args):
         if os.path.isfile(args.resume):
             print("=> loading checkpoint '{}'".format(args.resume))
             if args.gpu is None:
-                checkpoint = torch.load(args.resume)
+                # checkpoint = torch.load(args.resume)
+                checkpoint = torch.load(args.resume, map_location='cpu')
             else:
                 # Map model to be loaded to specified single gpu.
                 loc = 'cuda:{}'.format(args.gpu)
                 checkpoint = torch.load(args.resume, map_location=loc)
+                # checkpoint = torch.load(args.resume, map_location='cpu')
             args.start_epoch = checkpoint['epoch']
             best_acc1 = checkpoint['best_acc1']
             if args.gpu is not None:
@@ -276,6 +298,7 @@ def main_worker(gpu, ngpus_per_node, args):
             optimizer.load_state_dict(checkpoint['optimizer'])
             print("=> loaded checkpoint '{}' (epoch {})"
                   .format(args.resume, checkpoint['epoch']))
+
         else:
             print("=> no checkpoint found at '{}'".format(args.resume))
 
@@ -319,6 +342,8 @@ def main_worker(gpu, ngpus_per_node, args):
         validate(val_loader, model, criterion, args)
         return
 
+    # all_acc1 = []  # for auto zerobn
+
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             train_sampler.set_epoch(epoch)
@@ -330,13 +355,13 @@ def main_worker(gpu, ngpus_per_node, args):
         # evaluate on validation set
         acc1 = validate(val_loader, model, criterion, args)
 
-
-
         if args.our == 1:
             if epoch == args.zerobn:
                 best_acc1 = 0.0
+                # acc1 = 0.0
+                # args.mode = epoch % args.interval
+
             if epoch <= args.zerobn or epoch % args.interval == args.mode or epoch == args.epochs - 1:
-                print('zero epoch:\t', epoch)
 
                 # remember best acc@1 and save checkpoint
                 is_best = acc1 > best_acc1
@@ -408,13 +433,10 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
 
         if args.sr:
 
-            count = 0
             for m in model.modules():
                 if isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.SyncBatchNorm):
-                    count = count + 1
-                    if count not in skip_list:
-                        m.weight.grad.data.add_(args.ssr * torch.sign(m.weight.data))  # L1
-            count = 0
+                    m.weight.grad.data.add_(args.ssr * torch.sign(m.weight.data))  # L1
+
         optimizer.step()
 
         if args.our and epoch >= args.zerobn and (epoch % args.interval == args.mode or epoch == args.epochs - 1):
@@ -448,7 +470,6 @@ def validate(val_loader, model, criterion, args):
     with torch.no_grad():
         end = time.time()
         for i, (images, target) in enumerate(val_loader):
-            # print(images)
             if args.gpu is not None:
                 images = images.cuda(args.gpu, non_blocking=True)
             if torch.cuda.is_available():
@@ -456,7 +477,6 @@ def validate(val_loader, model, criterion, args):
 
             # compute output
             output = model(images)
-
             loss = criterion(output, target)
 
             # measure accuracy and record loss
@@ -475,15 +495,20 @@ def validate(val_loader, model, criterion, args):
         # TODO: this should also be done with the ProgressMeter
         print(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
               .format(top1=top1, top5=top5))
+        print(args.zerobn)
 
     return top1.avg
 
 
-def save_checkpoint(state, is_best, folder):
-    filename = os.path.join(folder, 'checkpoint.pth.tar')
-    torch.save(state, filename)
-    if is_best:
-        shutil.copyfile(filename, os.path.join(folder, 'model_best.pth.tar'))
+def save_checkpoint(state, is_best, folder, name=None):
+    if name is None:
+        filename = os.path.join(folder, 'checkpoint.pth.tar')
+        torch.save(state, filename)
+        if is_best:
+            shutil.copyfile(filename, os.path.join(folder, 'model_best.pth.tar'))
+    else:
+        filename = os.path.join(folder, name)
+        torch.save(state, filename)
 
 
 class AverageMeter(object):

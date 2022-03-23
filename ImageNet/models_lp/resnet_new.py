@@ -3,7 +3,7 @@ import torch.nn as nn
 import numpy as np
 
 
-__all__ = ['resnet50_new']
+__all__ = ['resnet50_newlp']
 
 
 def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1):
@@ -193,7 +193,7 @@ def _resnet(arch, block, layers, cfg, pretrained, progress, **kwargs):
     return model
 
 
-def resnet50_new(pretrained=False, progress=True, **kwargs):
+def resnet50_newlp(pretrained=False, progress=True, **kwargs):
     r"""ResNet-50 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
 
@@ -213,5 +213,3 @@ def resnet50_new(pretrained=False, progress=True, **kwargs):
 
     return _resnet('resnet50', Bottleneck, [3, 4, 6, 3], cfg, pretrained, progress,
                    **kwargs)
-
-

@@ -22,7 +22,7 @@ import torch.utils.data.distributed
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 # import torchvision.models as models
-import models
+import models_lp as models
 
 # import numpy as np
 model_names = sorted(name for name in models.__dict__
@@ -133,6 +133,13 @@ def zeroBN(model, args):
                 k = k.sign()
                 m.weight.data = m.weight.data * k
                 m.bias.data = m.bias.data * k
+
+                nonzero = torch.nonzero(k).size()[0]
+                all = k.size()[0]
+
+                if 1.0 * nonzero / all < 0.25:
+                    m.weight.data = m.weight.data * 0
+                    m.bias.data = m.bias.data * 0
     count = 0
 
 
