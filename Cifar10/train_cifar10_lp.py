@@ -18,7 +18,7 @@ import models_lp
 from models_lp.vgg import vgg_block
 
 # Training settings
-parser = argparse.ArgumentParser(description='PyTorch Slimming CIFAR training')
+parser = argparse.ArgumentParser(description='PyTorch ZeroBN CIFAR training')
 parser.add_argument('--dataset', type=str, default='cifar100',
                     help='training dataset (default: cifar100)')
 parser.add_argument('--sparsity-regularization', '-sr', dest='sr', action='store_true',
