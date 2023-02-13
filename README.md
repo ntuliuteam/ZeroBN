@@ -85,7 +85,7 @@ Please refer to the paper.
 
 Copyright (c) HP-NTU Digital Manufacturing Corporate Lab, Nanyang Technological University, Singapore.
 
-If you use the tool or adapt the tool in your works or publications, you are required to cite the following reference:
+If you use the tool or adapt the tool in your works or publications, you are required to cite the following references:
 ```bib
 @inproceedings{huai2021zerobn,
   title={ZeroBN: Learning Compact Neural Networks For Latency-Critical Edge Systems},
@@ -96,6 +96,18 @@ If you use the tool or adapt the tool in your works or publications, you are req
   organization={IEEE}
 }
 ```
+```bib
+@article{huai2023latency,
+  title={Latency-constrained DNN architecture learning for edge systems using zerorized batch normalization},
+  author={Huai, Shuo and Liu, Di and Kong, Hao and Liu, Weichen and Subramaniam, Ravi and Makaya, Christian and Lin, Qian},
+  journal={Future Generation Computer Systems},
+  volume={142},
+  pages={314--327},
+  year={2023},
+  publisher={Elsevier}
+}
+```
+
 **Contributors:**
 Shuo Huai, Lei Zhang, Di Liu, Weichen Liu, Ravi Subramaniam (HP).
 
