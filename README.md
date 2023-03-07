@@ -85,7 +85,8 @@ Please refer to the paper.
 
 Copyright (c) HP-NTU Digital Manufacturing Corporate Lab, Nanyang Technological University, Singapore.
 
-If you use the tool or adapt the tool in your works or publications, you are required to cite the following references:
+If you find that ZeroBN helps your research, please consider citing it:
+
 ```bib
 @inproceedings{huai2021zerobn,
   title={ZeroBN: Learning Compact Neural Networks For Latency-Critical Edge Systems},
